@@ -1,2 +1,183 @@
 import pandas as pd
 import numpy as np
+
+df = pd.read_csv('GalaxyZoo1_DR_table2.csv')
+
+df.head()
+
+df.shape
+
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score,confusion_matrix,classification_report
+
+df.insert(16,"Class",0)
+
+data= df.sample(frac =.01)
+
+data.shape
+
+data.head()
+
+l=[*range(0,len(data),1)]
+
+data.insert(0,'ID',l)
+
+for i in range(0,len(data)):
+    n=data.loc[data['ID']==i].index
+    if(data['SPIRAL'][n[0]]==1):
+        data['Class'][n[0]]=0
+    elif(data['ELLIPTICAL'][n[0]]==1):
+        data['Class'][n[0]]=1
+    else:
+        data['Class'][n[0]]=2
+        
+data.head()
+
+data.drop(data.columns[[14]],axis=1,inplace=True)
+data.drop(data.columns[[14]],axis=1,inplace=True)
+data.drop(data.columns[[14]],axis=1,inplace=True)
+
+data.drop(data.columns[[2]],axis=1,inplace=True)
+data.drop(data.columns[[2]],axis=1,inplace=True)
+
+data.head()
+
+x=data.iloc[:,:-1].values
+y=data['Class'].values
+
+xtrain,xtest,ytrain,ytest=train_test_split(x,y,test_size=0.30)
+
+
+#SVM
+
+obj=SVC(kernel="linear")
+obj.fit(xtrain,ytrain)
+pred=obj.predict(xtest)
+print("Accuracy score",accuracy_score(pred,ytest))
+print("Confusion matrix",confusion_matrix(pred,ytest))
+print("Classification report",classification_report(pred,ytest))
+
+#RANDOM FOREST
+
+from sklearn.ensemble import RandomForestRegressor
+
+forest=RandomForestRegressor(n_estimators=1000,criterion='mse',random_state=1,n_jobs=-1)
+
+forest.fit(xtrain,ytrain)
+y_train_pred=forest.predict(xtrain)
+y_test_pred=forest.predict(xtest)
+
+from sklearn.metrics import mean_squared_error
+t_train=mean_squared_error(ytrain,y_train_pred)
+t_test=mean_squared_error(ytest,y_test_pred)
+
+print('MSE train:%.3f,MSE test:%.3f'%(t_train,t_test))
+
+t_train,t_test
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10,10))
+plt.scatter(y_train_pred,y_train_pred-ytrain,c='steelblue',edgecolor='white',marker='o',s=50,alpha=0.7,label='training data')
+plt.scatter(y_test_pred,y_test_pred-ytest,c='limegreen',edgecolor='white',marker='s',s=60,alpha=1,label='test data')
+plt.xlabel('predected value')
+plt.ylabel('Residuals')
+plt.legend(loc='upper left')
+plt.hlines(y=0,xmin=-0.5,xmax=2.5,lw=2,color='black')
+plt.xlim([-0.5,2.5])
+plt.show()
+
+#K-MEANS
+
+from sklearn.cluster import KMeans
+km=KMeans(n_clusters=4,init='random',n_init=10,max_iter=300,random_state=0)
+y_km=km.fit_predict(x)
+
+center=km.cluster_centers_
+
+#plotting
+plt.figure(figsize=(10,10))
+plt.scatter(x[:,0],x[:,1],s=50,c='lightgreen',marker='d',edgecolor='black')
+plt.scatter(center[0,0],center[0,1],s=50,c='orange',marker='o',edgecolor='black',label='Center1')
+plt.scatter(center[1,0],center[1,1],s=50,c='blue',marker='>',edgecolor='black',label='Center2')
+plt.scatter(center[2,0],center[2,1],s=250,c='red',marker='*',edgecolor='black',label='Center3')
+plt.scatter(center[3,0],center[3,1],s=150,c='yellow',marker='<',edgecolor='black',label='Center4')
+#plt.scatter(center[4,0],center[4,1],s=200,c='brown',marker='^',edgecolor='black',label='Center5')
+plt.legend(scatterpoints=1)
+plt.grid()
+plt.show()
+print('Distortion:%.2f'%km.inertia_)
+
+#elbow method (use to find right value of k)
+distortion=[]
+for i in range(2,10):
+    km=KMeans(n_clusters=i,init='k-means++',n_init=10,max_iter=300,random_state=0)
+    km.fit(x)
+    distortion.append(km.inertia_)
+    
+plt.plot(range(2,10),distortion,marker='o')
+plt.xlabel('Number of clusters')
+plt.ylabel('Distortion')
+plt.show()
+
+#silhoutte_score
+from sklearn.metrics import silhouette_score
+
+silhoute=[]
+for i in range(2,10):
+    km=KMeans(n_clusters=i,init='k-means++',n_init=10,max_iter=300,random_state=0)
+    labels=km.fit_predict(x)
+    silhoute.append(silhouette_score(x,labels))
+    
+plt.plot(range(2,10),silhoute,marker='o')
+plt.xlabel('Number of clusters')
+plt.ylabel('silhoute')
+
+#Agglomerative Clustering
+
+from sklearn.cluster import AgglomerativeClustering
+
+ac=AgglomerativeClustering(n_clusters=5,affinity='euclidean',linkage='complete')
+lables=ac.fit_predict(x)
+print('Cluster labels:%s'%lables)
+
+#plt.figure(figsize=(10,20))
+plt.scatter(x[lables==0,0],x[lables==0,1],c='red')
+plt.scatter(x[lables==1,0],x[lables==1,1],c='green')
+plt.scatter(x[lables==2,0],x[lables==2,1],c='yellow')
+plt.scatter(x[lables==3,0],x[lables==3,1],c='blue')
+plt.scatter(x[lables==4,0],x[lables==4,1],c='black')
+plt.show()
+
+#dendograms
+from scipy.cluster.hierarchy import linkage
+
+row_clusters=linkage(data.values,method='complete',metric='euclidean')
+df1=pd.DataFrame(row_clusters,columns=['row label 1','row label 2','distance','no. of items in cluster'],index=['cluster %d'%(i+1) for i in range(row_clusters.shape[0])])
+print(df1)
+
+from scipy.cluster.hierarchy import dendrogram
+row_dendr=dendrogram(row_clusters,labels=lables)
+plt.tight_layout()
+plt.ylabel('Euclidean Distance')
+plt.show()
+
+#Decision_tree_regression
+
+X=data[['P_EL_DEBIASED']].values
+
+from sklearn.tree import DecisionTreeRegressor
+
+def lin_regplot(X,y,model):
+    plt.scatter(X,y,c='steelblue',edgecolor='white',s=70)
+    plt.plot(X,model.predict(X),color='black',lw=2)
+    return None
+    
+tree=DecisionTreeRegressor(max_depth=3)
+tree.fit(X,y)
+sort_idx=X.flatten().argsort()
+lin_regplot(X[sort_idx],y[sort_idx],tree)
+plt.xlabel('%lower status of population')
+plt.ylabel('price in $100s')
+plt.show()
